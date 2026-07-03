@@ -19,6 +19,14 @@ struct LinkedNode {
     LinkedNode* next = nullptr;
 };
 
+struct Payload {
+    int size;
+};
+
+struct Header {
+    Payload* payload;
+};
+
 Widget* find_widget(std::vector<Widget>& widgets, int id)
 {
     for(auto& w : widgets) {
@@ -88,24 +96,21 @@ TEST(OptionalPtrConstruction, FromEmptyUniquePtrHasNoValue)
     EXPECT_FALSE(opt.has_value());
 }
 
-TEST(OptionalPtrConstruction, CannotBeBuiltDirectlyFromNullptrLiteral)
+TEST(OptionalPtrConstruction, DirectNullptrLiteralConstructsEmpty)
 {
-    // A user reaching for the obvious `optional_ptr<Widget> opt(nullptr);`
-    // will find that the nullptr_t constructor is private - the class only
-    // wants that path used internally (and_then/or_else). Callers must go
-    // through a typed null pointer instead, e.g. `Widget* p = nullptr;`.
-    static_assert(!std::is_constructible_v<optional_ptr<Widget>, std::nullptr_t>,
-        "optional_ptr should not be publicly constructible from a bare nullptr literal");
+    // With the pointer_type constructor now the only viable candidate for a
+    // nullptr_t argument, users can spell an empty optional_ptr directly.
+    optional_ptr<Widget> opt(nullptr);
+
+    EXPECT_FALSE(opt.has_value());
 }
 
 TEST(OptionalPtrConstruction, BoolConversionIsExplicit)
 {
     // operator bool is explicit, so it can't silently decay into arithmetic
     // contexts (e.g. summing "how many are set" by accident).
-    static_assert(!std::is_convertible_v<optional_ptr<Widget>, bool>,
-        "optional_ptr's bool conversion must stay explicit");
-    static_assert(std::is_constructible_v<bool, optional_ptr<Widget>>,
-        "optional_ptr must still be explicitly testable as a bool");
+    static_assert(!std::is_convertible_v<optional_ptr<Widget>, bool>, "optional_ptr's bool conversion must stay explicit");
+    static_assert(std::is_constructible_v<bool, optional_ptr<Widget>>, "optional_ptr must still be explicitly testable as a bool");
 }
 
 // ===================== Access =====================
@@ -188,8 +193,7 @@ TEST(OptionalPtrAccess, ConstPointeeExposesConstReference)
     const Widget w { 8, "rivet" };
     optional_ptr<const Widget> opt(&w);
 
-    static_assert(std::is_same_v<decltype(opt.value()), const Widget&>,
-        "value() must not strip constness from the pointee");
+    static_assert(std::is_same_v<decltype(opt.value()), const Widget&>, "value() must not strip constness from the pointee");
     EXPECT_EQ(opt->id, 8);
 }
 
@@ -236,7 +240,9 @@ TEST(OptionalPtrAndThen, ChainsThroughLinkedListNodes)
 
     optional_ptr<LinkedNode> head(&first);
 
-    auto hop = [](LinkedNode* n) { return optional_ptr<LinkedNode>(n->next); };
+    auto hop = [](LinkedNode* n) {
+        return optional_ptr<LinkedNode>(n->next);
+    };
 
     auto result = head.and_then(hop).and_then(hop);
 
@@ -249,7 +255,9 @@ TEST(OptionalPtrAndThen, ShortCircuitsWhenNextIsNull)
     LinkedNode last { 1, nullptr };
     optional_ptr<LinkedNode> head(&last);
 
-    auto hop = [](LinkedNode* n) { return optional_ptr<LinkedNode>(n->next); };
+    auto hop = [](LinkedNode* n) {
+        return optional_ptr<LinkedNode>(n->next);
+    };
 
     // Walking past the tail must not dereference a null `next` pointer.
     auto oneHop = head.and_then(hop);
@@ -276,6 +284,33 @@ TEST(OptionalPtrAndThen, DoesNotInvokeCallableWhenSourceIsNull)
     EXPECT_EQ(invocationCount, 0);
 }
 
+TEST(OptionalPtrAndThen, TransformsToDifferentPointeeType)
+{
+    Payload payload { 128 };
+    Header header { &payload };
+    optional_ptr<Header> opt(&header);
+
+    // Maps optional_ptr<Header> -> optional_ptr<Payload>. This used to fail
+    // to compile: the empty branch of and_then had to construct a private
+    // nullptr_t optional_ptr<Payload>, which optional_ptr<Header>'s member
+    // function had no access to (different class instantiations don't share
+    // private access, even for the same template).
+    auto result = opt.and_then([](Header* h) { return optional_ptr<Payload>(h->payload); });
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(result->size, 128);
+}
+
+TEST(OptionalPtrAndThen, TransformToDifferentPointeeTypeShortCircuitsOnNull)
+{
+    Header header { nullptr };
+    optional_ptr<Header> opt(&header);
+
+    auto result = opt.and_then([](Header* h) { return optional_ptr<Payload>(h->payload); });
+
+    EXPECT_FALSE(result.has_value());
+}
+
 // ===================== or_else: fallback objects =====================
 
 TEST(OptionalPtrOrElse, ProvidesFallbackNodeWhenNull)
@@ -284,7 +319,9 @@ TEST(OptionalPtrOrElse, ProvidesFallbackNodeWhenNull)
     LinkedNode* raw = nullptr;
     optional_ptr<LinkedNode> missing(raw);
 
-    auto result = missing.or_else([&fallback]() { return optional_ptr<LinkedNode>(&fallback); });
+    auto result = missing.or_else([&fallback]() {
+        return optional_ptr<LinkedNode>(&fallback);
+    });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result.get(), &fallback);
@@ -314,11 +351,14 @@ TEST(OptionalPtrChaining, AndThenOrElseCombinedFindOrDefault)
     LinkedNode fallback { 0, nullptr };
 
     optional_ptr<LinkedNode> head(&first);
-    auto hop = [](LinkedNode* n) { return optional_ptr<LinkedNode>(n->next); };
+    auto hop = [](LinkedNode* n) {
+        return optional_ptr<LinkedNode>(n->next);
+    };
 
     // 1 -> 2 -> (end) -> fallback
-    auto result = head.and_then(hop).and_then(hop).or_else(
-        [&fallback]() { return optional_ptr<LinkedNode>(&fallback); });
+    auto result = head.and_then(hop).and_then(hop).or_else([&fallback]() {
+        return optional_ptr<LinkedNode>(&fallback);
+    });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->value, 0);

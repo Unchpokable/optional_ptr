@@ -141,11 +141,6 @@ public:
     }
 
 private:
-    optional_ptr(std::nullptr_t)
-        : m_ptr(nullptr) {
-
-          };
-
     pointer_type m_ptr { nullptr };
 };
 
