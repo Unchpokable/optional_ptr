@@ -10,14 +10,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(observing_ptr INTERFACE)
-add_library(ObservingPtr::observing_ptr ALIAS observing_ptr)
+add_library(optional_ptr INTERFACE)
+add_library(ObservingPtr::optional_ptr ALIAS optional_ptr)
 
-target_include_directories(observing_ptr INTERFACE
+target_include_directories(optional_ptr INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
 )
 
-target_compile_features(observing_ptr INTERFACE cxx_std_20)
+target_compile_features(optional_ptr INTERFACE cxx_std_20)
 
 # Everything below (generator enforcement, compile_commands.json, tests) only
 # applies when this repo is built directly, not when it is pulled in via

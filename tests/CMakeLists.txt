@@ -1,12 +1,12 @@
-add_executable(observing_ptr_tests
-    test_observing_ptr.cxx
+add_executable(optional_ptr_tests
+    test_optional_ptr.cxx
 )
 
-target_link_libraries(observing_ptr_tests
+target_link_libraries(optional_ptr_tests
     PRIVATE
-        observing_ptr
+        optional_ptr
         GTest::gtest_main
 )
 
 include(GoogleTest)
-gtest_discover_tests(observing_ptr_tests)
+gtest_discover_tests(optional_ptr_tests)
