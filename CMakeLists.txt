@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(ObservingPtr
+project(OptionalPtr
     VERSION 1.0.0
     DESCRIPTION "A safe, std::optional-like wrapper around raw C++ pointers"
     LANGUAGES CXX
@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(optional_ptr INTERFACE)
-add_library(ObservingPtr::optional_ptr ALIAS optional_ptr)
+add_library(OptionalPtr::optional_ptr ALIAS optional_ptr)
 
 target_include_directories(optional_ptr INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
@@ -25,7 +25,7 @@ target_compile_features(optional_ptr INTERFACE cxx_std_20)
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
         message(FATAL_ERROR
-            "ObservingPtr must be configured with the Ninja generator, e.g.:\n"
+            "OptionalPtr must be configured with the Ninja generator, e.g.:\n"
             "  cmake -S . -B build -G Ninja\n"
             "Got generator: '${CMAKE_GENERATOR}'."
         )
@@ -46,9 +46,9 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
         VERBATIM
     )
 
-    option(OBSERVING_PTR_BUILD_TESTS "Build observing_ptr tests" ON)
+    option(OPTIONAL_PTR_BUILD_TESTS "Build optional_ptr tests" ON)
 
-    if(OBSERVING_PTR_BUILD_TESTS)
+    if(OPTIONAL_PTR_BUILD_TESTS)
         enable_testing()
         add_subdirectory(deps)
         add_subdirectory(tests)

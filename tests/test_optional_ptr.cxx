@@ -43,7 +43,7 @@ Widget* find_widget(std::vector<Widget>& widgets, int id)
 TEST(OptionalPtrConstruction, RawPointerToExistingObjectHasValue)
 {
     Widget w { 1, "gear" };
-    optional_ptr<Widget> opt(&w);
+    optr::optional_ptr<Widget> opt(&w);
 
     EXPECT_TRUE(opt.has_value());
     EXPECT_TRUE(static_cast<bool>(opt));
@@ -53,7 +53,7 @@ TEST(OptionalPtrConstruction, RawPointerToExistingObjectHasValue)
 TEST(OptionalPtrConstruction, RawNullPointerHasNoValue)
 {
     Widget* raw = nullptr;
-    optional_ptr<Widget> opt(raw);
+    optr::optional_ptr<Widget> opt(raw);
 
     EXPECT_FALSE(opt.has_value());
     EXPECT_FALSE(static_cast<bool>(opt));
@@ -63,7 +63,7 @@ TEST(OptionalPtrConstruction, RawNullPointerHasNoValue)
 TEST(OptionalPtrConstruction, FromSharedPtrObservesSameAddress)
 {
     auto shared = std::make_shared<Widget>(Widget { 2, "bolt" });
-    optional_ptr<Widget> opt(shared);
+    optr::optional_ptr<Widget> opt(shared);
 
     EXPECT_TRUE(opt.has_value());
     EXPECT_EQ(opt.get(), shared.get());
@@ -74,7 +74,7 @@ TEST(OptionalPtrConstruction, FromSharedPtrObservesSameAddress)
 TEST(OptionalPtrConstruction, FromEmptySharedPtrHasNoValue)
 {
     std::shared_ptr<Widget> shared;
-    optional_ptr<Widget> opt(shared);
+    optr::optional_ptr<Widget> opt(shared);
 
     EXPECT_FALSE(opt.has_value());
 }
@@ -82,7 +82,7 @@ TEST(OptionalPtrConstruction, FromEmptySharedPtrHasNoValue)
 TEST(OptionalPtrConstruction, FromUniquePtrObservesSameAddress)
 {
     auto owner = std::make_unique<Widget>(Widget { 3, "nut" });
-    optional_ptr<Widget> opt(owner);
+    optr::optional_ptr<Widget> opt(owner);
 
     EXPECT_TRUE(opt.has_value());
     EXPECT_EQ(opt.get(), owner.get());
@@ -91,7 +91,7 @@ TEST(OptionalPtrConstruction, FromUniquePtrObservesSameAddress)
 TEST(OptionalPtrConstruction, FromEmptyUniquePtrHasNoValue)
 {
     std::unique_ptr<Widget> owner;
-    optional_ptr<Widget> opt(owner);
+    optr::optional_ptr<Widget> opt(owner);
 
     EXPECT_FALSE(opt.has_value());
 }
@@ -99,8 +99,8 @@ TEST(OptionalPtrConstruction, FromEmptyUniquePtrHasNoValue)
 TEST(OptionalPtrConstruction, DirectNullptrLiteralConstructsEmpty)
 {
     // With the pointer_type constructor now the only viable candidate for a
-    // nullptr_t argument, users can spell an empty optional_ptr directly.
-    optional_ptr<Widget> opt(nullptr);
+    // nullptr_t argument, users can spell an empty optr::optional_ptr directly.
+    optr::optional_ptr<Widget> opt(nullptr);
 
     EXPECT_FALSE(opt.has_value());
 }
@@ -109,8 +109,9 @@ TEST(OptionalPtrConstruction, BoolConversionIsExplicit)
 {
     // operator bool is explicit, so it can't silently decay into arithmetic
     // contexts (e.g. summing "how many are set" by accident).
-    static_assert(!std::is_convertible_v<optional_ptr<Widget>, bool>, "optional_ptr's bool conversion must stay explicit");
-    static_assert(std::is_constructible_v<bool, optional_ptr<Widget>>, "optional_ptr must still be explicitly testable as a bool");
+    static_assert(!std::is_convertible_v<optr::optional_ptr<Widget>, bool>, "optr::optional_ptr's bool conversion must stay explicit");
+    static_assert(
+        std::is_constructible_v<bool, optr::optional_ptr<Widget>>, "optr::optional_ptr must still be explicitly testable as a bool");
 }
 
 // ===================== Access =====================
@@ -118,7 +119,7 @@ TEST(OptionalPtrConstruction, BoolConversionIsExplicit)
 TEST(OptionalPtrAccess, DereferenceReturnsUnderlyingObject)
 {
     Widget w { 4, "washer" };
-    optional_ptr<Widget> opt(&w);
+    optr::optional_ptr<Widget> opt(&w);
 
     EXPECT_EQ(&*opt, &w);
     EXPECT_EQ((*opt).id, 4);
@@ -127,7 +128,7 @@ TEST(OptionalPtrAccess, DereferenceReturnsUnderlyingObject)
 TEST(OptionalPtrAccess, ArrowOperatorReachesMembers)
 {
     Widget w { 5, "screw" };
-    optional_ptr<Widget> opt(&w);
+    optr::optional_ptr<Widget> opt(&w);
 
     EXPECT_EQ(opt->id, 5);
     EXPECT_EQ(opt->name, "screw");
@@ -136,7 +137,7 @@ TEST(OptionalPtrAccess, ArrowOperatorReachesMembers)
 TEST(OptionalPtrAccess, MutationThroughOptionalPtrAffectsOriginal)
 {
     Widget w { 6, "clip" };
-    optional_ptr<Widget> opt(&w);
+    optr::optional_ptr<Widget> opt(&w);
 
     opt->name = "renamed-clip";
     opt.value().id = 60;
@@ -148,50 +149,50 @@ TEST(OptionalPtrAccess, MutationThroughOptionalPtrAffectsOriginal)
 TEST(OptionalPtrAccess, ValueThrowsOnNullptr)
 {
     Widget* raw = nullptr;
-    optional_ptr<Widget> opt(raw);
+    optr::optional_ptr<Widget> opt(raw);
 
-    EXPECT_THROW((void)opt.value(), detail::nullpointer_dereference);
+    EXPECT_THROW((void)opt.value(), optr::bad_optional_ptr_access);
 }
 
 TEST(OptionalPtrAccess, DereferenceThrowsOnNullptr)
 {
     Widget* raw = nullptr;
-    optional_ptr<Widget> opt(raw);
+    optr::optional_ptr<Widget> opt(raw);
 
-    EXPECT_THROW((void)*opt, detail::nullpointer_dereference);
+    EXPECT_THROW((void)*opt, optr::bad_optional_ptr_access);
 }
 
 TEST(OptionalPtrAccess, ArrowThrowsOnNullptr)
 {
     Widget* raw = nullptr;
-    optional_ptr<Widget> opt(raw);
+    optr::optional_ptr<Widget> opt(raw);
 
-    EXPECT_THROW((void)opt->id, detail::nullpointer_dereference);
+    EXPECT_THROW((void)opt->id, optr::bad_optional_ptr_access);
 }
 
 TEST(OptionalPtrAccess, BoolConversionGuardsAccessInIfStatement)
 {
     Widget w { 7, "pin" };
     Widget* nullRaw = nullptr;
-    optional_ptr<Widget> present(&w);
-    optional_ptr<Widget> absent(nullRaw);
+    optr::optional_ptr<Widget> present(&w);
+    optr::optional_ptr<Widget> absent(nullRaw);
 
     if(present) {
         SUCCEED();
     }
     else {
-        FAIL() << "expected optional_ptr wrapping a live object to be truthy";
+        FAIL() << "expected optr::optional_ptr wrapping a live object to be truthy";
     }
 
     if(absent) {
-        FAIL() << "expected optional_ptr wrapping nullptr to be falsy";
+        FAIL() << "expected optr::optional_ptr wrapping nullptr to be falsy";
     }
 }
 
 TEST(OptionalPtrAccess, ConstPointeeExposesConstReference)
 {
     const Widget w { 8, "rivet" };
-    optional_ptr<const Widget> opt(&w);
+    optr::optional_ptr<const Widget> opt(&w);
 
     static_assert(std::is_same_v<decltype(opt.value()), const Widget&>, "value() must not strip constness from the pointee");
     EXPECT_EQ(opt->id, 8);
@@ -203,7 +204,7 @@ TEST(OptionalPtrRegistryUseCase, FindExistingWidgetWrapsNonNull)
 {
     std::vector<Widget> widgets { { 1, "a" }, { 2, "b" }, { 3, "c" } };
 
-    optional_ptr<Widget> found(find_widget(widgets, 2));
+    optr::optional_ptr<Widget> found(find_widget(widgets, 2));
 
     ASSERT_TRUE(found.has_value());
     EXPECT_EQ(found->name, "b");
@@ -213,17 +214,17 @@ TEST(OptionalPtrRegistryUseCase, FindMissingWidgetWrapsNull)
 {
     std::vector<Widget> widgets { { 1, "a" } };
 
-    optional_ptr<Widget> found(find_widget(widgets, 999));
+    optr::optional_ptr<Widget> found(find_widget(widgets, 999));
 
     EXPECT_FALSE(found.has_value());
-    EXPECT_THROW((void)found.value(), detail::nullpointer_dereference);
+    EXPECT_THROW((void)found.value(), optr::bad_optional_ptr_access);
 }
 
 TEST(OptionalPtrRegistryUseCase, SafelyReadNameOrFallbackUsingHasValue)
 {
     std::vector<Widget> widgets { { 1, "a" } };
 
-    optional_ptr<Widget> found(find_widget(widgets, 999));
+    optr::optional_ptr<Widget> found(find_widget(widgets, 999));
 
     std::string name = found.has_value() ? found->name : std::string("<missing>");
 
@@ -238,10 +239,10 @@ TEST(OptionalPtrAndThen, ChainsThroughLinkedListNodes)
     LinkedNode second { 2, &third };
     LinkedNode first { 1, &second };
 
-    optional_ptr<LinkedNode> head(&first);
+    optr::optional_ptr<LinkedNode> head(&first);
 
     auto hop = [](LinkedNode* n) {
-        return optional_ptr<LinkedNode>(n->next);
+        return optr::optional_ptr<LinkedNode>(n->next);
     };
 
     auto result = head.and_then(hop).and_then(hop);
@@ -253,10 +254,10 @@ TEST(OptionalPtrAndThen, ChainsThroughLinkedListNodes)
 TEST(OptionalPtrAndThen, ShortCircuitsWhenNextIsNull)
 {
     LinkedNode last { 1, nullptr };
-    optional_ptr<LinkedNode> head(&last);
+    optr::optional_ptr<LinkedNode> head(&last);
 
     auto hop = [](LinkedNode* n) {
-        return optional_ptr<LinkedNode>(n->next);
+        return optr::optional_ptr<LinkedNode>(n->next);
     };
 
     // Walking past the tail must not dereference a null `next` pointer.
@@ -270,12 +271,12 @@ TEST(OptionalPtrAndThen, ShortCircuitsWhenNextIsNull)
 TEST(OptionalPtrAndThen, DoesNotInvokeCallableWhenSourceIsNull)
 {
     LinkedNode* raw = nullptr;
-    optional_ptr<LinkedNode> empty(raw);
+    optr::optional_ptr<LinkedNode> empty(raw);
 
     int invocationCount = 0;
     auto hop = [&invocationCount](LinkedNode* n) {
         ++invocationCount;
-        return optional_ptr<LinkedNode>(n->next); // would crash if ever reached
+        return optr::optional_ptr<LinkedNode>(n->next); // would crash if ever reached
     };
 
     auto result = empty.and_then(hop);
@@ -288,14 +289,16 @@ TEST(OptionalPtrAndThen, TransformsToDifferentPointeeType)
 {
     Payload payload { 128 };
     Header header { &payload };
-    optional_ptr<Header> opt(&header);
+    optr::optional_ptr<Header> opt(&header);
 
-    // Maps optional_ptr<Header> -> optional_ptr<Payload>. This used to fail
+    // Maps optr::optional_ptr<Header> -> optr::optional_ptr<Payload>. This used to fail
     // to compile: the empty branch of and_then had to construct a private
-    // nullptr_t optional_ptr<Payload>, which optional_ptr<Header>'s member
+    // nullptr_t optr::optional_ptr<Payload>, which optr::optional_ptr<Header>'s member
     // function had no access to (different class instantiations don't share
     // private access, even for the same template).
-    auto result = opt.and_then([](Header* h) { return optional_ptr<Payload>(h->payload); });
+    auto result = opt.and_then([](Header* h) {
+        return optr::optional_ptr<Payload>(h->payload);
+    });
 
     ASSERT_TRUE(result.has_value());
     EXPECT_EQ(result->size, 128);
@@ -304,9 +307,11 @@ TEST(OptionalPtrAndThen, TransformsToDifferentPointeeType)
 TEST(OptionalPtrAndThen, TransformToDifferentPointeeTypeShortCircuitsOnNull)
 {
     Header header { nullptr };
-    optional_ptr<Header> opt(&header);
+    optr::optional_ptr<Header> opt(&header);
 
-    auto result = opt.and_then([](Header* h) { return optional_ptr<Payload>(h->payload); });
+    auto result = opt.and_then([](Header* h) {
+        return optr::optional_ptr<Payload>(h->payload);
+    });
 
     EXPECT_FALSE(result.has_value());
 }
@@ -317,10 +322,10 @@ TEST(OptionalPtrOrElse, ProvidesFallbackNodeWhenNull)
 {
     LinkedNode fallback { -1, nullptr };
     LinkedNode* raw = nullptr;
-    optional_ptr<LinkedNode> missing(raw);
+    optr::optional_ptr<LinkedNode> missing(raw);
 
     auto result = missing.or_else([&fallback]() {
-        return optional_ptr<LinkedNode>(&fallback);
+        return optr::optional_ptr<LinkedNode>(&fallback);
     });
 
     ASSERT_TRUE(result.has_value());
@@ -332,12 +337,12 @@ TEST(OptionalPtrOrElse, DoesNotInvokeFallbackWhenSourceHasValue)
 {
     LinkedNode node { 42, nullptr };
     LinkedNode fallback { -1, nullptr };
-    optional_ptr<LinkedNode> present(&node);
+    optr::optional_ptr<LinkedNode> present(&node);
 
     int invocationCount = 0;
     auto result = present.or_else([&]() {
         ++invocationCount;
-        return optional_ptr<LinkedNode>(&fallback);
+        return optr::optional_ptr<LinkedNode>(&fallback);
     });
 
     EXPECT_EQ(invocationCount, 0);
@@ -350,14 +355,14 @@ TEST(OptionalPtrChaining, AndThenOrElseCombinedFindOrDefault)
     LinkedNode first { 1, &second };
     LinkedNode fallback { 0, nullptr };
 
-    optional_ptr<LinkedNode> head(&first);
+    optr::optional_ptr<LinkedNode> head(&first);
     auto hop = [](LinkedNode* n) {
-        return optional_ptr<LinkedNode>(n->next);
+        return optr::optional_ptr<LinkedNode>(n->next);
     };
 
     // 1 -> 2 -> (end) -> fallback
     auto result = head.and_then(hop).and_then(hop).or_else([&fallback]() {
-        return optional_ptr<LinkedNode>(&fallback);
+        return optr::optional_ptr<LinkedNode>(&fallback);
     });
 
     ASSERT_TRUE(result.has_value());
@@ -369,8 +374,8 @@ TEST(OptionalPtrChaining, AndThenOrElseCombinedFindOrDefault)
 TEST(OptionalPtrCopySemantics, CopyObservesSameAddress)
 {
     Widget w { 9, "washer" };
-    optional_ptr<Widget> original(&w);
-    optional_ptr<Widget> copy = original;
+    optr::optional_ptr<Widget> original(&w);
+    optr::optional_ptr<Widget> copy = original;
 
     EXPECT_EQ(copy.get(), original.get());
     EXPECT_EQ(copy.get(), &w);
@@ -380,9 +385,9 @@ TEST(OptionalPtrCopySemantics, AssignmentRebindsObservedAddress)
 {
     Widget a { 10, "a" };
     Widget b { 11, "b" };
-    optional_ptr<Widget> opt(&a);
+    optr::optional_ptr<Widget> opt(&a);
 
-    opt = optional_ptr<Widget>(&b);
+    opt = optr::optional_ptr<Widget>(&b);
 
     EXPECT_EQ(opt.get(), &b);
     EXPECT_EQ(opt->name, "b");
