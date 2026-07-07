@@ -3,6 +3,7 @@
 #ifndef OPTIONAL_PTR_HXX
 #define OPTIONAL_PTR_HXX
 
+#include <compare>
 #include <concepts>
 #include <exception>
 #include <functional>
@@ -11,7 +12,6 @@
 
 namespace optr
 {
-
 namespace detail
 {
 template<typename T, template<typename...> class U>
@@ -97,7 +97,7 @@ public:
 
     // classic smart pointer-like interfaces =========
 
-    constexpr bool has_value() const noexcept
+    [[nodiscard]] constexpr bool has_value() const noexcept
     {
         return m_ptr != nullptr;
     }
@@ -111,6 +111,15 @@ public:
     {
         if(!m_ptr) {
             throw bad_optional_ptr_access();
+        }
+
+        return *m_ptr;
+    }
+
+    [[nodiscard]] constexpr object_type& value_or(object_type& default_value) const noexcept
+    {
+        if(!m_ptr) {
+            return default_value;
         }
 
         return *m_ptr;
@@ -134,11 +143,40 @@ public:
         return m_ptr;
     }
 
-    [[nodiscard]] constexpr auto operator<=>(const optional_ptr&) const = default;
+    template<typename U>
+    [[nodiscard]] constexpr bool operator==(const optional_ptr<U>& other) const
+    {
+        return static_cast<void*>(m_ptr) == static_cast<void*>(other.get());
+    }
 
-    [[nodiscard]] constexpr bool operator==(const optional_ptr&) const = default;
+    [[nodiscard]] constexpr bool operator==(std::nullptr_t) const
+    {
+        return m_ptr == nullptr;
+    }
+
+    // Comparison operators are defined ONLY FOR USING WITH std::set\std::map. Result of comparison of optional_ptr pointing to independent
+    // objects are not specified by C++ standard. Use with caution.
+    [[nodiscard]] constexpr std::strong_ordering operator<=>(const optional_ptr& other) const
+    {
+        if(m_ptr == other.m_ptr) {
+            return std::strong_ordering::equal;
+        };
+
+        return std::less<pointer_type> {}(m_ptr, other.m_ptr) ? std::strong_ordering::less : std::strong_ordering::greater;
+    }
+
+    [[nodiscard]] constexpr std::strong_ordering operator<=>(std::nullptr_t) const
+    {
+        // The built-in operator<=> candidates only cover pointer <=> pointer
+        // of the same type; std::nullptr_t is not one of them, so it must be
+        // cast to pointer_type first (the same reason std::unique_ptr/
+        // shared_ptr define this overload explicitly instead of relying on
+        // the raw operator).
+        return m_ptr <=> static_cast<pointer_type>(nullptr);
+    }
 
     // Optional-like interfaces =========
+
     template<typename F>
     requires(std::invocable<F, pointer_type>)
     constexpr auto and_then(F&& f) const
@@ -173,6 +211,28 @@ public:
         }
     }
 
+    template<typename F>
+    requires(std::invocable<F, pointer_type>)
+    constexpr auto transform(F&& f) const
+    {
+        using result_type = std::invoke_result_t<F, pointer_type>;
+
+        // result_type is what F returns -- already a pointer (e.g. Payload*).
+        // optional_ptr<X> wraps X*, so wrapping optional_ptr<result_type>
+        // would wrongly demand a Payload** here; unwrap one level of pointer
+        // to get optional_ptr<Payload> instead.
+        static_assert(std::is_pointer_v<result_type>, "optional_ptr<T>::transform(F) requires the return type of F to be a pointer type");
+
+        using pointee_type = std::remove_pointer_t<result_type>;
+
+        if(has_value()) {
+            return optional_ptr<pointee_type>(std::invoke(std::forward<F>(f), m_ptr));
+        }
+        else {
+            return optional_ptr<pointee_type>();
+        }
+    }
+
 private:
     pointer_type m_ptr { nullptr };
 };
@@ -182,7 +242,7 @@ template<typename T>
 struct std::hash<optr::optional_ptr<T>> {
     size_t operator()(const optr::optional_ptr<T>& opt) const noexcept
     {
-        return std::hash<T*> {}(opt.get());
+        return std::hash<typename optr::optional_ptr<T>::pointer_type> {}(opt.get());
     }
 };
 
